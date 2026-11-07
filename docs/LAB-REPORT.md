@@ -6,14 +6,20 @@
 
 ---
 
-## 1. Introduction
+## 1. Introduction & Objectives
 
+### 1.1 Introduction
 Automated software testing and continuous integration (CI) are fundamental pillars of modern software engineering. In enterprise web applications, testing ensures that individual business rules operate correctly in isolation (unit testing), while validating that layered subsystems—including security filters, object-relational mapping (ORM), serialization layers, and database constraints—collaborate properly under realistic operational conditions (integration testing).
 
-This laboratory work implements a test pyramid for the **University Management System (UMS)**, a multi-role REST API built with Spring Boot, Spring Security, and Spring Data JPA. The project incorporates:
-1. **Isolated Unit Tests** with JUnit 5 and Mockito to verify domain invariants and service-layer validation rules.
-2. **End-to-End Integration Tests** with Spring MockMvc and an in-memory H2 database to validate HTTP response shapes, transaction boundaries, and Spring Security authorization rules.
-3. **Continuous Integration (CI) Pipeline** utilizing GitHub Actions to automatically run test suites on push and pull request events, ensuring zero regression across development branches.
+This laboratory work implements a test pyramid and automated delivery pipeline for the **University Management System (UMS)**, a multi-role REST API built with Spring Boot, Spring Security, and Spring Data JPA.
+
+### 1.2 Objectives
+The primary objectives of this laboratory experiment are:
+- **Service Layer Unit Testing**: Construct isolated unit tests using JUnit 5 and Mockito to verify service-level domain logic, exception throwing, and critical business invariants (e.g., preventing deletion of the last remaining system administrator and validating unique student identifiers) without starting the Spring ApplicationContext.
+- **Full-Slice Integration Testing**: Develop end-to-end integration tests using Spring `MockMvc` and an in-memory H2 database to validate the full HTTP request lifecycle, JSON request/response body mapping, database transaction rollbacks, and standard REST HTTP status codes (`201 Created`, `200 OK`, `204 No Content`, `401 Unauthorized`, `404 Not Found`, `409 Conflict`).
+- **Access Control & Security Verification**: Exercise the Spring Security filter chain against authenticated and unauthenticated callers to confirm that role-based access control (RBAC) boundaries are strictly enforced across Admin, Teacher, and Student resources.
+- **Continuous Integration Pipeline Construction**: Design and deploy an automated GitHub Actions CI workflow triggered on repository `push` and `pull_request` events to execute headless Maven builds (`./mvnw -B test`) on Ubuntu runners with Java 21 Temurin.
+- **Build Quality & Performance Analysis**: Measure execution performance differences between mock-based unit tests and container-backed integration tests, ensuring all tests pass reliably with zero warnings or regressions.
 
 ---
 
@@ -243,3 +249,4 @@ Execution of the test suite via the Maven Surefire plugin yielded zero failures 
 ## 8. Conclusion
 
 In this laboratory exercise, an automated testing and continuous integration architecture was constructed for the University Management System. A total of 6 unit tests were implemented using JUnit 5 and Mockito to enforce service invariants in complete isolation, and 3 full-stack integration tests were engineered using Spring MockMvc and H2 database to validate REST contracts, password hashing confidentiality, and Spring Security authorization. Finally, a GitHub Actions workflow was established, achieving automated regression testing and build verification with 100% test pass rates on remote runners.
+

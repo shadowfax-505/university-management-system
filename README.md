@@ -1,10 +1,12 @@
 # University Management System (CSE 3230 – Lab 4)
 
+[![Java CI with Maven](https://github.com/shadowfax-505/university-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/shadowfax-505/university-management-system/actions/workflows/ci.yml)
+
 Spring Boot 3.5 REST API with three roles (Admin, Teacher, Student), Spring Security
 (session login/logout, BCrypt password hashing, role-based access control) and Docker Compose
 (app + MySQL 8.4).
 
-Full explanation of every file: `docs/UMS-Explained-Bangla.pdf` (Bangla, line by line) and `docs/UMS-Explained.pdf` (English).
+Full explanation of every file: `docs/UMS-Explained-Bangla.pdf` (Bangla, line by line), `docs/UMS-Explained.pdf` (English), and lab report `docs/LAB-REPORT.md`.
 
 ## Where to find each requirement
 
@@ -23,7 +25,10 @@ Full explanation of every file: `docs/UMS-Explained-Bangla.pdf` (Bangla, line by
 | Swagger UI | `src/main/java/com/university/ums/config/OpenApiConfig.java` |
 | Configuration | `src/main/resources/application.yml` |
 | Dockerization | `Dockerfile`, `compose.yaml`, `.env.example`, `.dockerignore` |
-| Automated tests | `src/test/java/com/university/ums/UniversityApiTests.java` |
+| Automated unit tests | `src/test/java/com/university/ums/service/` (AdminServiceTest, StudentServiceTest) |
+| Automated integration tests | `src/test/java/com/university/ums/` (TeacherIntegrationTest, UniversityApiTests) |
+| Continuous Integration | `.github/workflows/ci.yml` |
+| Lab report | `docs/LAB-REPORT.md` |
 | Live demo | `demo.sh` |
 
 ## Folder layout
@@ -33,7 +38,7 @@ university-management-system/
 ├── Dockerfile, compose.yaml      Docker (requirement 3)
 ├── pom.xml, mvnw, .mvn/          Maven build + wrapper
 ├── demo.sh                       curl walkthrough
-├── docs/                         explanation PDFs (Bangla + English)
+├── docs/                         explanation PDFs (Bangla + English) + lab report
 └── src/
     ├── main/java/com/university/ums/
     │   ├── controller/   REST endpoints (requirement 1)
