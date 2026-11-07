@@ -1,0 +1,43 @@
+# Start everything:  docker compose up --build
+# Stop:              docker compose down        (add -v to also delete the database volume)
+# Values like ${DB_PASSWORD:-ums_password} come from a .env file if present, else the default after ":-".
+
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-university_db}
+      MYSQL_USER: ${DB_USER:-ums_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-ums_password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+    volumes:
+      - db-data:/var/lib/mysql          # data survives container restarts
+    healthcheck:
+      # -h 127.0.0.1 forces TCP, which only answers once MySQL has finished its first-time setup
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    # No "ports:" on purpose: only the app container can reach MySQL (over the compose network).
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy      # wait until MySQL accepts connections
+    environment:
+      # "db" is the service name above; compose's internal DNS resolves it to the MySQL container
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${DB_NAME:-university_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-ums_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ums_password}
+      APP_ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      APP_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      APP_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu}
+    ports:
+      - "8080:8080"                      # host:container
+    restart: unless-stopped
+
+volumes:
+  db-data:

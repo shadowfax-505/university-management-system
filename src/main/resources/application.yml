@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: university-management-system
+  datasource:
+    # Defaults are for running on your laptop against a local MySQL.
+    # In Docker, compose.yaml overrides them with SPRING_DATASOURCE_URL etc.
+    url: jdbc:mysql://localhost:3306/university_db
+    username: ums_user
+    password: ums_password
+  jpa:
+    hibernate:
+      # Create/alter tables from the @Entity classes on startup (fine for a lab project)
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true   # JavaScript cannot read the session cookie
+        same-site: lax    # cookie not sent on cross-site POST/PUT/DELETE (CSRF protection)
+
+# First admin, created on startup only if no admin exists (see DataInitializer).
+# Override with environment variables APP_ADMIN_USERNAME, APP_ADMIN_PASSWORD, APP_ADMIN_EMAIL.
+app:
+  admin:
+    username: admin
+    password: admin123
+    email: admin@university.edu
+  # Also create demo users on a fresh database (admin2, teacher1-3, student1-3). Set APP_DEMO_DATA=false to skip.
+  demo-data: true
+
+# Swagger UI (http://localhost:8080/swagger-ui.html)
+springdoc:
+  swagger-ui:
+    tags-sorter: alpha            # Admins, Authentication, Students, Teachers
+    operations-sorter: method     # GET, POST, PUT, DELETE order inside each group
+    try-it-out-enabled: true      # request forms are editable without an extra click
+    persist-authorization: true   # keep the Authorize credentials after a page reload
