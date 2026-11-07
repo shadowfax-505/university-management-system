@@ -6,7 +6,7 @@ Spring Boot 3.5 REST API with three roles (Admin, Teacher, Student), Spring Secu
 (session login/logout, BCrypt password hashing, role-based access control) and Docker Compose
 (app + MySQL 8.4).
 
-Full explanation of every file: `docs/UMS-Explained-Bangla.pdf` (Bangla, line by line), `docs/UMS-Explained.pdf` (English), and lab report `docs/LAB-REPORT.md`.
+Full explanation of every file: `docs/UMS-Explained-Bangla.pdf` (Bangla, line by line), `docs/UMS-Explained.pdf` (English), and lab reports `docs/LAB-REPORT.md` / `docs/LAB-REPORT-SHORT.md`.
 
 ## Where to find each requirement
 
@@ -28,7 +28,7 @@ Full explanation of every file: `docs/UMS-Explained-Bangla.pdf` (Bangla, line by
 | Automated unit tests | `src/test/java/com/university/ums/service/` (AdminServiceTest, StudentServiceTest) |
 | Automated integration tests | `src/test/java/com/university/ums/` (TeacherIntegrationTest, UniversityApiTests) |
 | Continuous Integration | `.github/workflows/ci.yml` |
-| Lab report | `docs/LAB-REPORT.md` |
+| Lab report | `docs/LAB-REPORT.md` (Full), `docs/LAB-REPORT-SHORT.md` (Summary) |
 | Live demo | `demo.sh` |
 
 ## Folder layout

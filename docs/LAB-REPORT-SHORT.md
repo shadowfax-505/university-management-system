@@ -1,86 +1,109 @@
-# Lab Report: Automated Testing and Continuous Integration (Executive Summary)
+# Lab Report: Automated Testing and Continuous Integration for University Management System (Shortened Version)
 
 **Course:** CSE 3230 – Software Development & Web Technologies Lab  
 **Project:** University Management System (UMS) REST API  
-**Environment:** Java 21, Spring Boot 3.5.16, Spring Security 6, H2 Database, GitHub Actions  
+**Environment:** Java 21 LTS, Spring Boot 3.5.16, Spring Security 6, H2 In-Memory DB, GitHub Actions  
 
 ---
 
-## 1. Objectives
+## 1. Introduction
 
-- **Unit Testing:** Implement isolated service-layer unit tests using JUnit 5 and Mockito to enforce domain rules and business invariants without booting the Spring container.
-- **Integration Testing:** Build full-slice API integration tests using Spring `MockMvc` and an in-memory H2 database to validate HTTP contracts, JSON serialization, and database transactions.
-- **Security & Access Control:** Verify authentication filter chains and role-based access control (RBAC) across Admin, Teacher, and Student endpoints.
-- **Continuous Integration (CI):** Establish an automated GitHub Actions CI pipeline executing `./mvnw -B test` against JDK 21 on all `push` and `pull_request` events to `main`.
-- **Performance Evaluation:** Measure and analyze execution performance differences between unit tests and container-backed integration tests.
+Automated software testing and continuous integration (CI) are central to robust enterprise application development. Testing ensures that isolated business logic functions reliably without regression, while full-slice integration tests verify that cross-cutting concerns—such as security filters, object-relational mapping (ORM), and database transactions—operate together seamlessly. This report details the testing architecture and automated CI pipeline implemented for the University Management System (UMS) REST API.
 
 ---
 
-## 2. Testing Methodology
+## 2. Objectives
+
+- **Service Layer Unit Testing:** Implement isolated unit tests using JUnit 5 and Mockito to enforce core business rules and domain invariants (including last-administrator deletion protection and student ID uniqueness) without loading the Spring container.
+- **Full-Slice Integration Testing:** Construct end-to-end integration tests using Spring `MockMvc` and an in-memory H2 database to validate HTTP routing, JSON serialization, transaction rollbacks, and standard REST HTTP status codes (`201`, `200`, `204`, `401`, `404`, `409`).
+- **Access Control & Security Verification:** Exercise the Spring Security filter chain to confirm strict enforcement of role-based access control (RBAC) across Admin, Teacher, and Student resources.
+- **Automated CI Pipeline Construction:** Deploy a GitHub Actions workflow triggered on repository `push` and `pull_request` events to execute automated, headless Maven builds (`./mvnw -B test`) on Ubuntu runners with Java 21 Temurin.
+- **Build Quality & Performance Evaluation:** Quantify execution time differences between unit and integration test layers to evaluate test pyramid efficiency while maintaining a zero-warning, zero-failure build pipeline.
+
+---
+
+## 3. System Architecture & Testing Strategy
+
+The system follows a three-tier layered architecture (Controller $\rightarrow$ Service $\rightarrow$ Repository) secured by Spring Security and backed by Spring Data JPA. Testing is divided into two distinct levels of the test pyramid:
 
 | Dimension | Unit Testing | Integration Testing |
 | :--- | :--- | :--- |
-| **Target** | `AdminService`, `StudentService` | `TeacherController` (full slice) |
-| **Tooling** | JUnit 5, Mockito (`@ExtendWith(MockitoExtension.class)`) | `@SpringBootTest`, `@AutoConfigureMockMvc`, `@Transactional` |
-| **Dependencies** | Mock repositories & services (`@Mock`, `@InjectMocks`) | Real Spring context, H2 in-memory DB (MySQL mode) |
-| **Execution Speed**| ~0.216 s across all 6 tests (~36 ms/test) | ~6.217 s (context bootstrap + Hibernate DDL) |
-| **State Handling** | Stateless mock expectations | Automatic transactional rollback per test |
+| **Scope** | `AdminService`, `StudentService` | `TeacherController` (full slice) |
+| **Frameworks** | JUnit 5, Mockito (`@ExtendWith(MockitoExtension.class)`) | `@SpringBootTest`, `@AutoConfigureMockMvc`, `@Transactional` |
+| **Dependencies** | Mock repositories and helper services (`@Mock`, `@InjectMocks`) | Real Spring ApplicationContext, H2 database (MySQL mode) |
+| **Execution Time** | ~0.216 s total across 6 tests (~36 ms per test) | ~6.217 s (context bootstrap + Hibernate DDL) |
+| **Data Isolation** | Ephemeral in-memory mock expectations | Automatic transactional rollback per test method |
 
 ---
 
-## 3. Unit Test Specifications (6 Tests)
+## 4. Unit Testing Implementation
 
-| Test ID | Class | Method | Scenario & Validation |
+Unit tests validate business logic in pure isolation with zero Spring container overhead. Entity IDs generated by database sequences are supplied using Spring's `ReflectionTestUtils.setField`.
+
+| Test ID | Target Class | Test Method | Scenario & Expected Outcome |
 | :--- | :--- | :--- | :--- |
-| **UT-01** | `AdminServiceTest` | `create_validAdmin_savesAndReturnsResponse` | Validates password requirement check, unique constraint verification, entity save, and response mapping. |
-| **UT-02** | `AdminServiceTest` | `findById_nonExistingId_throwsResourceNotFoundException` | Asserts `ResourceNotFoundException` is thrown when querying a non-existent admin ID. |
-| **UT-03** | `AdminServiceTest` | `delete_lastAdmin_throwsConflictException` | Enforces the system invariant: deleting the final administrator throws `ConflictException` and aborts deletion. |
-| **UT-04** | `StudentServiceTest` | `create_validStudent_savesAndReturnsResponse` | Validates student entity fields, unique student ID check, and response DTO mapping. |
-| **UT-05** | `StudentServiceTest` | `create_duplicateStudentId_throwsConflictException` | Asserts `ConflictException` is raised when registering an already existing institutional student ID. |
-| **UT-06** | `StudentServiceTest` | `findById_nonExistingId_throwsResourceNotFoundException` | Asserts `ResourceNotFoundException` is thrown when a requested student ID is not found. |
+| **UT-01** | `AdminService` | `create_validAdmin_savesAndReturnsResponse` | Valid `AdminRequest`: verifies password check, uniqueness validation, entity save, and response DTO mapping. |
+| **UT-02** | `AdminService` | `findById_nonExistingId_throwsResourceNotFoundException` | Non-existent admin ID (`Optional.empty()`): throws `ResourceNotFoundException`. |
+| **UT-03** | `AdminService` | `delete_lastAdmin_throwsConflictException` | Admin count $\le 1$: throws `ConflictException("Cannot delete the last admin account")` and aborts deletion. |
+| **UT-04** | `StudentService` | `create_validStudent_savesAndReturnsResponse` | Valid `StudentRequest`: validates unique student ID, saves entity, and returns matching `StudentResponse`. |
+| **UT-05** | `StudentService` | `create_duplicateStudentId_throwsConflictException` | Student ID already in database: throws `ConflictException` and prevents duplicate insert. |
+| **UT-06** | `StudentService` | `findById_nonExistingId_throwsResourceNotFoundException` | Non-existent student ID (`Optional.empty()`): throws `ResourceNotFoundException`. |
 
 ---
 
-## 4. Integration Test Specifications (3 Tests)
+## 5. Integration Testing Implementation
 
-| Test ID | Class | Method | Scope & Expected HTTP Codes |
+Integration tests simulate real HTTP requests through the full filter chain, controller, service layer, and database using `MockMvc` connected to an in-memory H2 database (`jdbc:h2:mem:testdb;MODE=MySQL`).
+
+| Test ID | Target Class | Test Method | Scope & Status Code Verification |
 | :--- | :--- | :--- | :--- |
-| **IT-01** | `TeacherIntegrationTest` | `fullTeacherLifecycle_createReadUpdateDelete` | Full CRUD lifecycle as `ADMIN`: `POST /api/teachers` (`201 Created` + `Location`) $\rightarrow$ `GET` (`200 OK`) $\rightarrow$ `PUT` (`200 OK`) $\rightarrow$ `DELETE` (`204 No Content`) $\rightarrow$ `GET` (`404 Not Found`). |
-| **IT-02** | `TeacherIntegrationTest` | `createTeacher_duplicateUsername_returnsConflict` | Submitting duplicate usernames across roles triggers `GlobalExceptionHandler` returning `409 Conflict`. |
-| **IT-03** | `TeacherIntegrationTest` | `unauthenticatedAccess_isRejected` | Unauthenticated GET and POST requests are rejected with `401 Unauthorized`. |
+| **IT-01** | `TeacherController` | `fullTeacherLifecycle_createReadUpdateDelete` | Full CRUD lifecycle as `ADMIN`: `POST` (`201 Created` + `Location`) $\rightarrow$ `GET` (`200 OK`) $\rightarrow$ `PUT` (`200 OK`) $\rightarrow$ `DELETE` (`204 No Content`) $\rightarrow$ `GET` (`404 Not Found`). |
+| **IT-02** | `TeacherController` | `createTeacher_duplicateUsername_returnsConflict` | Cross-role duplicate username submission triggers `GlobalExceptionHandler` returning `409 Conflict`. |
+| **IT-03** | `TeacherController` | `unauthenticatedAccess_isRejected` | Unauthenticated requests to protected endpoints return `401 Unauthorized`. |
 
 ---
 
-## 5. Continuous Integration Pipeline
+## 6. Continuous Integration Pipeline
 
-The CI pipeline is defined in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
-- **Trigger:** Automatic execution on `push` and `pull_request` targeting `main`.
-- **Runner Environment:** `ubuntu-latest` (Ubuntu 24.04 LTS).
-- **Tooling Versions:** `actions/checkout@v5` and `actions/setup-java@v5` (Node 24 runtime, zero deprecation warnings).
-- **JDK Distribution:** Eclipse Temurin 21 with automatic Maven cache (`~/.m2/repository`).
-- **Command:** `./mvnw -B test` (deterministic, headless execution).
+The CI workflow is configured in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
+- **Triggers:** Automatically runs on `push` and `pull_request` events targeting `main`.
+- **Environment:** `ubuntu-latest` running Eclipse Temurin JDK 21.
+- **Actions Modernization:** Utilizes `actions/checkout@v5` and `actions/setup-java@v5` targeting the Node.js 24 runtime, eliminating deprecation warnings.
+- **Dependency Caching:** Automatically caches Maven dependencies (`~/.m2/repository`) to accelerate execution.
+- **Build Execution:** Executes `./mvnw -B test` in batch mode for deterministic headless test verification.
 
 ---
 
-## 6. Verification & Experimental Results
+## 7. Experimental Results & Verification
+
+All 25 tests (16 baseline API tests, 6 service unit tests, 3 controller integration tests) execute cleanly with zero failures across local and remote environments:
 
 ```
-Results:
-Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Results:
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 
-| Metric | Local Environment (macOS ARM64) | Remote CI Runner (GitHub Actions) |
+| Metric | Local Workstation (macOS ARM64) | Remote CI Runner (GitHub Actions) |
 | :--- | :--- | :--- |
-| **Total Test Suite** | 25 tests (16 API + 6 Unit + 3 Integration) | 25 tests |
+| **Test Suite Total** | 25 tests | 25 tests |
 | **Pass Rate** | 100% (0 failures, 0 errors) | 100% (0 failures, 0 errors) |
-| **Unit Test Duration** | ~0.22 s | ~0.28 s |
-| **Integration Test Duration** | ~6.22 s | ~7.12 s |
-| **Total Job Execution Time** | 7.55 s (test phase) | 32 s – 35 s (end-to-end container lifecycle) |
-| **Warnings** | 0 warnings | 0 warnings |
+| **Unit Test Duration** | ~0.216 s | ~0.280 s |
+| **Integration Test Duration** | ~6.217 s | ~7.120 s |
+| **Total Pipeline Duration** | 7.55 s (local test compile) | 24 s – 32 s (runner checkout to completion) |
+| **Deprecation Warnings** | 0 warnings | 0 warnings |
 
 ---
 
-## 7. Conclusion
+## 8. Discussion
 
-The testing pyramid and CI pipeline for the University Management System were successfully designed and verified. Mock-based unit tests execute in under 250 milliseconds to safeguard domain business rules, while Spring MockMvc integration tests validate HTTP routing, security enforcement, and transactional integrity. With GitHub Actions CI operational, every code revision undergoes automated regression verification, ensuring reliable delivery.
+1. **Test Pyramid Economics:** Unit tests ran in **~0.22 s** combined, whereas integration tests required **~6.22 s** due to Spring context creation and Hibernate schema generation. This ~28x speedup confirms that granular edge cases and domain invariants are best validated through unit tests, preserving integration tests for architectural boundaries.
+2. **State Isolation with Transactions:** Tagging integration test classes with `@Transactional` guarantees that all persistence operations roll back automatically at the end of each test method. This prevents database state pollution between test cases without requiring manual cleanup routines.
+3. **Mocking Encapsulated Entity IDs:** Entities with `@GeneratedValue(strategy = IDENTITY)` lack public ID setters to preserve encapsulation. Unit tests cleanly solved this by using Spring's `ReflectionTestUtils.setField` without modifying production domain models.
+4. **CI Pipeline Maintenance:** Upgrading GitHub Actions from `v4` to `v5` addressed runner deprecation notices associated with Node.js 20, ensuring the automated delivery pipeline remains stable and warning-free on modern GitHub infrastructure.
+
+---
+
+## 9. Conclusion
+
+The testing and CI infrastructure for the University Management System was successfully implemented and verified. Six isolated unit tests ensure service invariants remain intact, three full-slice integration tests validate security and HTTP contracts against an in-memory database, and an automated GitHub Actions CI pipeline provides continuous regression protection. The pipeline operates with a 100% pass rate, zero warnings, and consistent sub-minute build times.
