@@ -30,7 +30,7 @@ Full explanation of every file: `docs/UMS-Explained-Bangla.pdf` (Bangla, line by
 | Continuous Integration | `.github/workflows/ci.yml` |
 | Lab report | `docs/LAB-REPORT.md` (Full), `docs/LAB-REPORT-SHORT.md` (Summary) |
 | Testing & CI guide (PDF) | `docs/Testing-and-CI-Explained.pdf` |
-| Live demo | `demo.sh` |
+| Manual E2E tests & live demo | `demo.sh` (8-step cURL walkthrough) |
 
 ## Folder layout
 
