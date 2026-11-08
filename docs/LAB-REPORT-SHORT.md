@@ -63,7 +63,26 @@ Integration tests simulate real HTTP requests through the full filter chain, con
 
 ---
 
-## 6. Continuous Integration Pipeline
+## 6. Manual Testing Implementation (`demo.sh` & Swagger UI)
+
+Manual testing validates the live application running in Docker Compose (`docker compose up --build`) across network sockets, cookie management, and real MySQL 8.4 database constraints.
+
+| Test Case | Scenario / Step | HTTP Method & Path | Expected Status | Objective |
+| :--- | :--- | :--- | :--- | :--- |
+| **MT-01** | Anonymous Access Check | `GET /api/students` | `401 Unauthorized` | Verify unauthenticated requests are rejected. |
+| **MT-02** | Admin Session Login | `POST /api/auth/login` | `200 OK` | Authenticate with seeded admin and capture `JSESSIONID`. |
+| **MT-03** | Entity Creation | `POST /api/teachers`<br>`POST /api/students` | `201 Created` | Create Teacher and Student entities; verify auto-increment IDs. |
+| **MT-04** | Negative Validation & Conflict | `POST /api/students` (dup)<br>`POST /api/students` (bad) | `409 Conflict`<br>`400 Bad Request` | Assert duplicate username returns 409; blank/malformed body returns 400. |
+| **MT-05** | Teacher RBAC Boundaries | `GET /api/teachers`<br>`GET /api/students`<br>`GET /api/admins` | `200 OK`<br>`403 Forbidden`<br>`403 Forbidden` | Verify Teacher can access teachers but is forbidden from students and admins. |
+| **MT-06** | Student RBAC Boundaries | `GET /api/students`<br>`GET /api/teachers` | `200 OK`<br>`403 Forbidden` | Verify Student can access students but is forbidden from teachers. |
+| **MT-07** | Admin Lifecycle Management | `PUT /api/students/{id}`<br>`DELETE /api/students/{id}`<br>`GET /api/students/{id}` | `200 OK`<br>`204 No Content`<br>`404 Not Found` | Verify update, idempotent deletion, and 404 on deleted resources. |
+| **MT-08** | Session Invalidation | `POST /api/auth/logout`<br>`GET /api/auth/me` | `200 OK`<br>`401 Unauthorized` | Destroy session; confirm stale session cookie is rejected. |
+
+Additionally, **Swagger UI** (`http://localhost:8080/swagger-ui.html`) allows interactive payload inspection and endpoint verification via either HTTP Basic Authentication or session cookies.
+
+---
+
+## 7. Continuous Integration Pipeline
 
 The CI workflow is configured in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 - **Triggers:** Automatically runs on `push` and `pull_request` events targeting `main`.
@@ -74,7 +93,7 @@ The CI workflow is configured in [`.github/workflows/ci.yml`](../.github/workflo
 
 ---
 
-## 7. Experimental Results & Verification
+## 8. Experimental Results & Verification
 
 All 25 tests (16 baseline API tests, 6 service unit tests, 3 controller integration tests) execute cleanly with zero failures across local and remote environments:
 
@@ -95,15 +114,16 @@ All 25 tests (16 baseline API tests, 6 service unit tests, 3 controller integrat
 
 ---
 
-## 8. Discussion
+## 9. Discussion
 
 1. **Test Pyramid Economics:** Unit tests ran in **~0.22 s** combined, whereas integration tests required **~6.22 s** due to Spring context creation and Hibernate schema generation. This ~28x speedup confirms that granular edge cases and domain invariants are best validated through unit tests, preserving integration tests for architectural boundaries.
 2. **State Isolation with Transactions:** Tagging integration test classes with `@Transactional` guarantees that all persistence operations roll back automatically at the end of each test method. This prevents database state pollution between test cases without requiring manual cleanup routines.
-3. **Mocking Encapsulated Entity IDs:** Entities with `@GeneratedValue(strategy = IDENTITY)` lack public ID setters to preserve encapsulation. Unit tests cleanly solved this by using Spring's `ReflectionTestUtils.setField` without modifying production domain models.
-4. **CI Pipeline Maintenance:** Upgrading GitHub Actions from `v4` to `v5` addressed runner deprecation notices associated with Node.js 20, ensuring the automated delivery pipeline remains stable and warning-free on modern GitHub infrastructure.
+3. **Manual vs. Automated Synergy:** Manual testing via `demo.sh` and Swagger UI is essential for black-box smoke testing against real MySQL containers, while automated unit and integration tests in CI provide rapid, zero-cost regression defense on every commit.
+4. **Mocking Encapsulated Entity IDs:** Entities with `@GeneratedValue(strategy = IDENTITY)` lack public ID setters to preserve encapsulation. Unit tests cleanly solved this by using Spring's `ReflectionTestUtils.setField` without modifying production domain models.
+5. **CI Pipeline Maintenance:** Upgrading GitHub Actions from `v4` to `v5` addressed runner deprecation notices associated with Node.js 20, ensuring the automated delivery pipeline remains stable and warning-free on modern GitHub infrastructure.
 
 ---
 
-## 9. Conclusion
+## 10. Conclusion
 
 The testing and CI infrastructure for the University Management System was successfully implemented and verified. Six isolated unit tests ensure service invariants remain intact, three full-slice integration tests validate security and HTTP contracts against an in-memory database, and an automated GitHub Actions CI pipeline provides continuous regression protection. The pipeline operates with a 100% pass rate, zero warnings, and consistent sub-minute build times.

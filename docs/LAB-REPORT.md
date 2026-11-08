@@ -150,7 +150,42 @@ spring:
 
 ---
 
-## 5. Continuous Integration with GitHub Actions
+## 5. Manual Testing Implementation (`demo.sh` & Swagger UI)
+
+While automated testing provides regression protection in CI pipelines, manual testing against a live, running instance validates real network sockets, HTTP cookies, and end-to-end containerized deployments (`docker compose up --build`).
+
+### 5.1 Scripted Manual Testing Suite (`demo.sh`)
+The project includes a shell-based manual testing script ([`demo.sh`](../demo.sh)) utilizing `curl` with cookie jars (`-b` and `-c`) to simulate independent user sessions against the running Docker environment (`http://localhost:8080`).
+
+| Test Case | Scenario / Step | HTTP Method & Path | Expected Status | Verification Objective |
+| :--- | :--- | :--- | :--- | :--- |
+| **MT-01** | Anonymous Access Check | `GET /api/students` | `401 Unauthorized` | Verify that unauthenticated requests to protected endpoints are rejected by the security filter. |
+| **MT-02** | Admin Session Login | `POST /api/auth/login` | `200 OK` | Authenticate using seeded credentials (`admin`/`admin123`) and capture `JSESSIONID` cookie in cookie jar. |
+| **MT-03** | Entity Creation | `POST /api/teachers`<br>`POST /api/students` | `201 Created` | Create new Teacher (`karim`) and Student (`rahim`) records as Admin; verify database sequence persistence. |
+| **MT-04** | Negative Validation & Conflict | `POST /api/students` (duplicate)<br>`POST /api/students` (invalid body) | `409 Conflict`<br>`400 Bad Request` | Assert duplicate username triggers `409 Conflict`; blank name/malformed email triggers `400 Bad Request`. |
+| **MT-05** | Teacher RBAC Boundaries | `POST /api/auth/login` (Teacher)<br>`GET /api/teachers`<br>`GET /api/students`<br>`GET /api/admins` | `200 OK`<br>`200 OK`<br>`403 Forbidden`<br>`403 Forbidden` | Verify Teacher can view teacher list, but is blocked with `403 Forbidden` on student and admin endpoints. |
+| **MT-06** | Student RBAC Boundaries | `POST /api/auth/login` (Student)<br>`GET /api/students`<br>`GET /api/teachers` | `200 OK`<br>`200 OK`<br>`403 Forbidden` | Verify Student can view student list, but is blocked with `403 Forbidden` when attempting to access teachers. |
+| **MT-07** | Admin Lifecycle Management | `PUT /api/students/{id}`<br>`DELETE /api/students/{id}`<br>`GET /api/students/{id}`<br>`DELETE /api/teachers/{id}` | `200 OK`<br>`204 No Content`<br>`404 Not Found`<br>`204 No Content` | Verify entity update, idempotent resource deletion, and confirm that querying deleted entity returns `404 Not Found`. |
+| **MT-08** | Session Invalidation | `POST /api/auth/logout`<br>`GET /api/auth/me` | `200 OK`<br>`401 Unauthorized` | Call logout to destroy session on server, then verify that the existing cookie jar returns `401 Unauthorized`. |
+
+### 5.2 Interactive Manual Testing (Swagger UI)
+Swagger UI (`http://localhost:8080/swagger-ui.html`) provides interactive exploratory testing:
+1. **HTTP Basic Auth**: Using the **Authorize** dialog with `admin` / `admin123` sends credentials with every request header.
+2. **Session-Based Authentication**: Executing `POST /api/auth/login` directly stores the session cookie in the browser, allowing exploratory testing across all endpoints with real-time JSON schema validation.
+
+### 5.3 Manual vs. Automated Testing Comparison
+
+| Dimension | Manual Testing (`demo.sh` / Swagger UI) | Automated Testing (JUnit / Mockito / MockMvc) |
+| :--- | :--- | :--- |
+| **Execution Time** | ~15–30 seconds (requires running container) | ~0.22 s (unit) / ~6.2 s (integration) |
+| **Infrastructure** | Live Docker Compose (App + MySQL 8.4) | Ephemeral in-memory H2, zero setup |
+| **CI Integration** | Complex to run headlessly, high flakiness risk | Native Maven execution in GitHub Actions |
+| **State Reset** | Requires manual database reset (`docker compose down -v`) | Automatic rollback per test method via `@Transactional` |
+| **Primary Value** | Real-world black-box sanity check & UI exploration | Instant feedback during code refactoring & CI regression defense |
+
+---
+
+## 6. Continuous Integration with GitHub Actions
 
 Continuous Integration automatically validates code changes against a standardized target environment, preventing broken builds or regressions from being merged into main production branches.
 
@@ -195,9 +230,9 @@ jobs:
 
 ---
 
-## 6. Experimental Results & Verification
+## 7. Experimental Results & Verification
 
-### 6.1 Test Suite Execution Metrics
+### 7.1 Test Suite Execution Metrics
 Execution of the test suite via the Maven Surefire plugin yielded zero failures across both local development and remote CI environments:
 
 ```
@@ -221,7 +256,7 @@ Execution of the test suite via the Maven Surefire plugin yielded zero failures 
 [INFO] ------------------------------------------------------------------------
 ```
 
-### 6.2 Local vs. CI Performance Comparison
+### 7.2 Local vs. CI Performance Comparison
 
 | Metric | Local Workstation (Apple Silicon) | GitHub Actions Runner (`ubuntu-latest`) |
 | :--- | :--- | :--- |
@@ -234,7 +269,7 @@ Execution of the test suite via the Maven Surefire plugin yielded zero failures 
 
 ---
 
-## 7. Discussion & Engineering Analysis
+## 8. Discussion & Engineering Analysis
 
 1. **Test Pyramid Economics**: The unit tests in `AdminServiceTest` and `StudentServiceTest` executed in an aggregate of **0.216 seconds**, whereas integration suites required **~6.2 seconds** due to Spring Application Context bootstrapping and Hibernate DDL generation. This 30x difference illustrates why fine-grained business logic and edge cases belong in unit tests, while integration tests should focus on interface contracts and security boundaries.
 
@@ -246,7 +281,7 @@ Execution of the test suite via the Maven Surefire plugin yielded zero failures 
 
 ---
 
-## 8. Conclusion
+## 9. Conclusion
 
 In this laboratory exercise, an automated testing and continuous integration architecture was constructed for the University Management System. A total of 6 unit tests were implemented using JUnit 5 and Mockito to enforce service invariants in complete isolation, and 3 full-stack integration tests were engineered using Spring MockMvc and H2 database to validate REST contracts, password hashing confidentiality, and Spring Security authorization. Finally, a GitHub Actions workflow was established, achieving automated regression testing and build verification with 100% test pass rates on remote runners.
 
